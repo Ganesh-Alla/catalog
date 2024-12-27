@@ -2,22 +2,17 @@
 'use client'
 
 import { useState } from 'react'
-import { PolynomialInput } from '@/lib/types'
+import { samples } from '@/lib/json/sample'
+// import { PolynomialInput, PolynomialResult } from '@/lib/types'
 
 export default function Home() {
-  const [jsonInput, setJsonInput] = useState<string>('')
+  // State to manage which sample is selected and the results
+  const [selectedSample, setSelectedSample] = useState<string>('')
   const [result, setResult] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
-  const validateJSON = (input: string): PolynomialInput => {
-    const data = JSON.parse(input);
-    if (!data.keys?.n || !data.keys?.k) {
-      throw new Error('Invalid JSON structure: missing required keys');
-    }
-    return data as PolynomialInput;
-  }
-
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -25,15 +20,20 @@ export default function Home() {
     setIsLoading(true)
 
     try {
-      // Validate JSON before sending
-      const validatedInput = validateJSON(jsonInput);
+      // Find the selected sample data
+      const selectedData = samples.find(s => s.name === selectedSample)?.data
       
+      if (!selectedData) {
+        throw new Error('Please select a valid sample')
+      }
+
+      // Send the data to our API endpoint
       const response = await fetch('/api/solve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(validatedInput),
+        body: JSON.stringify(selectedData),
       })
 
       const data = await response.json()
@@ -57,39 +57,46 @@ export default function Home() {
         <div className="px-6 py-4">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Polynomial Solver</h1>
           <p className="text-gray-600 mb-4">
-            Enter the JSON data for the polynomial roots. The format should include the number of roots (n)
-            and minimum required roots (k).
+            Select a sample polynomial to solve and find its constant term.
           </p>
         </div>
         <div className="px-6 py-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="json-input" className="block text-sm font-medium text-gray-700">
-                JSON Input
+              <label htmlFor="sample-select" className="block text-sm font-medium text-gray-700">
+                Select Sample
               </label>
-              <textarea
-                id="json-input"
-                value={jsonInput}
-                onChange={(e) => setJsonInput(e.target.value)}
-                placeholder={`{
-  "keys": {
-    "n": 4,
-    "k": 3
-  },
-  "1": {
-    "base": "10",
-    "value": "4"
-  },
-  ...
-}`}
-                className="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none focus:border-blue-500 min-h-[200px] font-mono"
-              />
+              <select
+                id="sample-select"
+                value={selectedSample}
+                onChange={(e) => setSelectedSample(e.target.value)}
+                className="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none focus:border-blue-500"
+              >
+                <option value="">Choose a sample...</option>
+                {samples.map((sample) => (
+                  <option key={sample.name} value={sample.name}>
+                    {sample.name}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            {selectedSample && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Sample Data Preview
+                </label>
+                <pre className="w-full px-3 py-2 text-gray-700 bg-gray-50 rounded-lg overflow-auto max-h-[200px] font-mono text-sm">
+                  {JSON.stringify(samples.find(s => s.name === selectedSample)?.data, null, 2)}
+                </pre>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={isLoading || !jsonInput.trim()}
+              disabled={isLoading || !selectedSample}
               className={`w-full px-4 py-2 text-white font-semibold rounded-lg ${
-                isLoading || !jsonInput.trim()
+                isLoading || !selectedSample
                   ? 'bg-blue-400 cursor-not-allowed'
                   : 'bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50'
               }`}
@@ -107,6 +114,7 @@ export default function Home() {
               )}
             </button>
           </form>
+
           <div className="mt-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-2">Result</h2>
             <div className="bg-gray-100 rounded-lg p-4">
@@ -120,7 +128,7 @@ export default function Home() {
                 <p className="text-red-600">{error}</p>
               )}
               {result === null && !error && (
-                <p className="text-gray-500">Submit JSON to see the result</p>
+                <p className="text-gray-500">Select a sample and submit to see the result</p>
               )}
             </div>
           </div>
